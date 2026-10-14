@@ -10,3 +10,4 @@ venv/
 tests/
 .env
 .DS_Store
+datasets/

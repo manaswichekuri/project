@@ -19,7 +19,7 @@ import { CommonModule } from '@angular/common';
   `]
 })
 export class RiskBadgeComponent {
-  @Input() category: 'Low' | 'Medium' | 'High' | 'Critical' | string = 'Low';
+  @Input() category: 'Low' | 'Medium' | 'High' | 'Critical' | string | null | undefined = 'Low';
   @Input() score?: number;
   @Input() showIcon: boolean = true;
 

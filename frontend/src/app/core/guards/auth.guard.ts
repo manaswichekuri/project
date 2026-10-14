@@ -10,6 +10,7 @@ export const authGuard: CanActivateFn = () => {
     return true;
   }
 
-  router.navigate(['/login']);
-  return false;
+  // Clear any stale/expired session before redirecting
+  authService.logout();
+  return router.createUrlTree(['/login']);
 };

@@ -1,4 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { catchError, of, switchMap } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
@@ -12,6 +14,12 @@ import { User } from '../../models/user.model';
   standalone: true,
   imports: [CommonModule, RouterModule, RiskBadgeComponent],
   template: `
+    <div class="cyber-card not-found" *ngIf="notFound">
+      <span class="material-icons-outlined">person_off</span>
+      <p>User <code>{{ requestedId }}</code> was not found.</p>
+      <a routerLink="/users" class="btn-back">Back to Monitored Users</a>
+    </div>
+
     <div class="user-detail-page" *ngIf="profileData">
       <!-- Top Navigation -->
       <div class="back-nav">
@@ -308,10 +316,14 @@ import { User } from '../../models/user.model';
       &.yes { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
     }
     .alert-text { color: #ef4444; font-weight: 700; }
+    .not-found { text-align: center; color: #9ca3af; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
   `]
 })
 export class UserDetailComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   profileData: any = null;
+  notFound = false;
+  requestedId = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -319,9 +331,18 @@ export class UserDetailComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const userId = this.route.snapshot.paramMap.get('id');
-    if (userId) {
-      this.apiService.getUserRiskProfile(userId).subscribe(data => this.profileData = data);
-    }
+    // React to param changes so navigating between users reuses this component correctly
+    this.route.paramMap.pipe(
+      switchMap(params => {
+        this.requestedId = params.get('id') ?? '';
+        this.profileData = null;
+        this.notFound = false;
+        return this.apiService.getUserRiskProfile(this.requestedId).pipe(catchError(() => of(null)));
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(data => {
+      this.profileData = data;
+      this.notFound = !data;
+    });
   }
 }

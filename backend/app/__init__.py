@@ -1,8 +1,11 @@
 import logging
 from flask import Flask, jsonify
 from flask_cors import CORS
-from app.config.settings import Config
+from werkzeug.exceptions import HTTPException
+from app.config.settings import Config, DEFAULT_SECRET_KEY
 from app.utils.db import init_db_indexes
+from app.utils.request_utils import BadRequest
+from app.services.auth_service import seed_default_admin
 from app.routes.system_routes import system_bp
 from app.routes.auth_routes import auth_bp
 from app.routes.user_routes import user_bp
@@ -19,14 +22,18 @@ logging.basicConfig(
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    
-    # Enable CORS for Angular frontend
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
-    
-    # Initialize DB indexes
+
+    if config_class.APP_ENV == 'production' and config_class.SECRET_KEY == DEFAULT_SECRET_KEY:
+        app.logger.warning("SECRET_KEY is set to the insecure default. Set a strong SECRET_KEY in production!")
+
+    origins = config_class.CORS_ORIGINS
+    CORS(app, resources={r"/api/*": {"origins": '*' if '*' in origins else origins}})
+
+    # Initialize DB indexes and the admin account
     with app.app_context():
         init_db_indexes()
-        
+        seed_default_admin()
+
     # Register blueprints
     app.register_blueprint(system_bp)
     app.register_blueprint(auth_bp)
@@ -35,7 +42,7 @@ def create_app(config_class=Config):
     app.register_blueprint(alert_bp)
     app.register_blueprint(ml_bp)
     app.register_blueprint(risk_bp)
-    
+
     # Root & API info routes
     @app.route('/')
     @app.route('/api')
@@ -44,8 +51,8 @@ def create_app(config_class=Config):
         return jsonify({
             'status': 'HEALTHY',
             'service': 'AI-Powered Insider Threat Detection REST API',
-            'frontend_dashboard_url': 'http://localhost:4200',
             'endpoints': {
+                'health': '/api/v1/health',
                 'auth': '/api/v1/auth/login',
                 'system_status': '/api/v1/system/status',
                 'users': '/api/v1/users',
@@ -56,14 +63,24 @@ def create_app(config_class=Config):
             }
         })
 
-    # Global error handlers
-    @app.errorhandler(404)
-    def handle_404(e):
-        return jsonify({'error': 'Resource not found', 'code': 404}), 404
+    # Lightweight liveness probe (no auth, no heavy queries)
+    @app.route('/api/v1/health')
+    def health():
+        return jsonify({'status': 'ok'})
 
-    @app.errorhandler(500)
+    # Global error handlers
+    @app.errorhandler(BadRequest)
+    def handle_bad_request(e):
+        return jsonify({'error': str(e), 'code': 400}), 400
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(e):
+        message = 'Resource not found' if e.code == 404 else e.description
+        return jsonify({'error': message, 'code': e.code}), e.code
+
+    @app.errorhandler(Exception)
     def handle_500(e):
-        app.logger.error(f"Internal server error: {e}")
+        app.logger.exception(f"Internal server error: {e}")
         return jsonify({'error': 'Internal server error', 'code': 500}), 500
 
     return app

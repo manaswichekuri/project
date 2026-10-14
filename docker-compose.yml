@@ -1,22 +1,24 @@
+# Production-style stack: MongoDB + Gunicorn/Flask API + Nginx-served Angular SPA.
+# Only the frontend is published; nginx proxies /api/ to the backend on the internal network.
+# Usage: cp .env.example .env  (set SECRET_KEY!)  &&  docker compose up -d --build
+
 services:
   mongodb:
     image: mongo:7.0
     container_name: insider_threat_mongo
     restart: unless-stopped
-    ports:
-      - "27017:27017"
     environment:
-      - MONGO_INITDB_DATABASE=insider_threat_db
+      - MONGO_INITDB_DATABASE=${MONGODB_DB_NAME:-insider_threat_db}
     volumes:
       - mongodb_data:/data/db
     networks:
       - insider_net
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 5s
+      start_period: 10s
 
   backend:
     build:
@@ -24,29 +26,36 @@ services:
       dockerfile: Dockerfile
     container_name: insider_threat_backend
     restart: unless-stopped
-    ports:
-      - "5001:5001"
     environment:
+      - APP_ENV=production
       - PORT=5001
-      - FLASK_ENV=production
-      - MONGODB_URI=mongodb://mongodb:27017/insider_threat_db
-      - MONGODB_DB_NAME=insider_threat_db
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin@12345}
+      - JWT_EXPIRES_HOURS=${JWT_EXPIRES_HOURS:-8}
+      - MONGODB_URI=mongodb://mongodb:27017/${MONGODB_DB_NAME:-insider_threat_db}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-insider_threat_db}
       - USE_MOCK_DB=false
-      - SECRET_KEY=insider-threat-capstone-secret-key-2026
-      - CONTAMINATION_RATE=0.1
-      - RISK_THRESHOLD_HIGH=60.0
-      - RISK_THRESHOLD_CRITICAL=85.0
+      - ALLOW_MOCK_FALLBACK=false
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+      - CONTAMINATION_RATE=${CONTAMINATION_RATE:-0.1}
+      - RISK_THRESHOLD_HIGH=${RISK_THRESHOLD_HIGH:-60.0}
+      - RISK_THRESHOLD_CRITICAL=${RISK_THRESHOLD_CRITICAL:-85.0}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+      - MODEL_DIR=/app/datasets
+    volumes:
+      - model_data:/app/datasets
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - insider_net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/system/status"]
-      interval: 5s
+      test: ["CMD", "curl", "-fsS", "http://localhost:5001/api/v1/health"]
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 20s
 
   frontend:
     build:
@@ -55,7 +64,7 @@ services:
     container_name: insider_threat_frontend
     restart: unless-stopped
     ports:
-      - "4200:80"
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       backend:
         condition: service_healthy
@@ -68,4 +77,4 @@ networks:
 
 volumes:
   mongodb_data:
-    driver: local
+  model_data:

@@ -1,5 +1,6 @@
+from pymongo import ReturnDocument
 from app.utils.db import get_db
-from datetime import datetime
+from app.utils.time_utils import utc_now_iso
 
 def get_alerts(status=None, severity=None, user_id=None):
     db = get_db()
@@ -23,7 +24,7 @@ def update_alert_status(alert_id, new_status, notes=None):
 
     update_fields = {
         'status': new_status,
-        'updated_at': datetime.utcnow().isoformat()
+        'updated_at': utc_now_iso()
     }
     if notes:
         update_fields['admin_notes'] = notes
@@ -32,7 +33,7 @@ def update_alert_status(alert_id, new_status, notes=None):
         {'alert_id': alert_id},
         {'$set': update_fields},
         projection={'_id': 0},
-        return_document=True
+        return_document=ReturnDocument.AFTER
     )
     return result
 

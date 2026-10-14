@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify
 from app.services.user_service import get_all_users, get_user_by_id, get_user_risk_profile
 from app.utils.json_encoder import jsonify_doc
+from app.utils.auth import require_auth
 
 user_bp = Blueprint('users', __name__, url_prefix='/api/v1/users')
+user_bp.before_request(require_auth)
 
 @user_bp.route('', methods=['GET'])
 def list_users():

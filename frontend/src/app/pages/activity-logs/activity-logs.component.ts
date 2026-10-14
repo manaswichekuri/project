@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { ActivityLog } from '../../models/activity.model';
 
@@ -24,7 +26,7 @@ import { ActivityLog } from '../../models/activity.model';
           <input
             type="text"
             [(ngModel)]="filterUserId"
-            (ngModelChange)="onFilterChange()"
+            (ngModelChange)="userIdInput$.next($event)"
             placeholder="e.g. EMP-1013"
           />
         </div>
@@ -200,6 +202,9 @@ import { ActivityLog } from '../../models/activity.model';
   `]
 })
 export class ActivityLogsComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
+  userIdInput$ = new Subject<string>();
+  private fetchSub?: Subscription;
   activities: ActivityLog[] = [];
   filterUserId = '';
   filterEventType = 'All';
@@ -214,11 +219,16 @@ export class ActivityLogsComponent implements OnInit {
 
   ngOnInit(): void {
     this.fetchLogs();
+    this.userIdInput$
+      .pipe(debounceTime(350), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.onFilterChange());
+    this.apiService.dataRefresh$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.fetchLogs());
   }
 
   fetchLogs(): void {
-    this.apiService.getActivities(
-      this.filterUserId,
+    this.fetchSub?.unsubscribe();
+    this.fetchSub = this.apiService.getActivities(
+      this.filterUserId.trim(),
       this.filterEventType,
       this.filterAfterHours,
       this.currentPage,
@@ -226,7 +236,7 @@ export class ActivityLogsComponent implements OnInit {
     ).subscribe(res => {
       this.activities = res.activities;
       this.total = res.total;
-      this.totalPages = res.pages;
+      this.totalPages = Math.max(1, res.pages);
     });
   }
 
@@ -236,7 +246,9 @@ export class ActivityLogsComponent implements OnInit {
   }
 
   changePage(delta: number): void {
-    this.currentPage += delta;
+    const next = this.currentPage + delta;
+    if (next < 1 || next > this.totalPages) return;
+    this.currentPage = next;
     this.fetchLogs();
   }
 }

@@ -1,11 +1,12 @@
+import re
 from app.utils.db import get_db
-from datetime import datetime
 
 def get_all_users(search_query=None, department=None, risk_category=None):
     db = get_db()
     query = {}
 
     if search_query:
+        search_query = re.escape(search_query.strip()[:100])
         query['$or'] = [
             {'name': {'$regex': search_query, '$options': 'i'}},
             {'user_id': {'$regex': search_query, '$options': 'i'}},

@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
@@ -339,6 +340,7 @@ import { User } from '../../models/user.model';
   `]
 })
 export class DashboardComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   summary: RiskSummary | null = null;
   highRiskUsers: User[] = [];
   recentAlerts: SecurityAlert[] = [];
@@ -347,7 +349,7 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadDashboardData();
-    this.apiService.dataRefresh$.subscribe(() => {
+    this.apiService.dataRefresh$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.loadDashboardData();
     });
   }

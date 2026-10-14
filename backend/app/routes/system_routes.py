@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify
 from app.utils.db import get_db, is_mock_db
 from app.utils.json_encoder import jsonify_doc
+from app.utils.auth import require_auth
 
 system_bp = Blueprint('system', __name__, url_prefix='/api/v1/system')
+system_bp.before_request(require_auth)
 
 @system_bp.route('/status', methods=['GET'])
 def get_system_status():

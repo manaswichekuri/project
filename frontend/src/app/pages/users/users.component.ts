@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { User } from '../../models/user.model';
 import { RiskBadgeComponent } from '../../shared/components/risk-badge/risk-badge.component';
@@ -28,7 +30,7 @@ import { RiskBadgeComponent } from '../../shared/components/risk-badge/risk-badg
             <input
               type="text"
               [(ngModel)]="searchQuery"
-              (ngModelChange)="onFilterChange()"
+              (ngModelChange)="searchInput$.next($event)"
               placeholder="Search by name, ID, or role..."
             />
           </div>
@@ -209,6 +211,9 @@ import { RiskBadgeComponent } from '../../shared/components/risk-badge/risk-badg
   `]
 })
 export class UsersComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
+  private fetchSub?: Subscription;
+  searchInput$ = new Subject<string>();
   users: User[] = [];
   searchQuery = '';
   selectedDepartment = 'All';
@@ -218,13 +223,18 @@ export class UsersComponent implements OnInit {
 
   ngOnInit(): void {
     this.fetchUsers();
-    this.apiService.dataRefresh$.subscribe(() => {
+    this.searchInput$
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.fetchUsers());
+    this.apiService.dataRefresh$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.fetchUsers();
     });
   }
 
   fetchUsers(): void {
-    this.apiService.getUsers(this.searchQuery, this.selectedDepartment, this.selectedRiskCategory)
+    // Cancel any in-flight request so a slow, stale response can't overwrite newer results
+    this.fetchSub?.unsubscribe();
+    this.fetchSub = this.apiService.getUsers(this.searchQuery.trim(), this.selectedDepartment, this.selectedRiskCategory)
       .subscribe(res => this.users = res.users);
   }
 

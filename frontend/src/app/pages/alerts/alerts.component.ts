@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { SecurityAlert } from '../../models/alert.model';
 import { RiskBadgeComponent } from '../../shared/components/risk-badge/risk-badge.component';
 
@@ -226,15 +228,16 @@ import { RiskBadgeComponent } from '../../shared/components/risk-badge/risk-badg
   `]
 })
 export class AlertsComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   alerts: SecurityAlert[] = [];
   selectedStatus = 'All';
   selectedSeverity = 'All';
 
-  constructor(private apiService: ApiService) {}
+  constructor(private apiService: ApiService, private notifications: NotificationService) {}
 
   ngOnInit(): void {
     this.fetchAlerts();
-    this.apiService.dataRefresh$.subscribe(() => {
+    this.apiService.dataRefresh$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.fetchAlerts();
     });
   }
@@ -247,6 +250,7 @@ export class AlertsComponent implements OnInit {
 
   updateStatus(alertId: string, newStatus: string): void {
     this.apiService.updateAlertStatus(alertId, newStatus).subscribe(() => {
+      this.notifications.success(`Alert ${alertId} marked as ${newStatus}.`);
       this.fetchAlerts();
     });
   }

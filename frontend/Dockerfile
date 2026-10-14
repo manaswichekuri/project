@@ -3,31 +3,22 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy dependency definitions
-COPY package*.json ./
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-# Install npm dependencies
-RUN npm install
-
-# Copy application source code
 COPY . .
-
-# Build the Angular production application
 RUN npm run build -- --configuration production
 
 # Stage 2: Serve using Nginx
-FROM nginx:alpine
+FROM nginx:1.27-alpine
 
-# Remove default nginx static files
 RUN rm -rf /usr/share/nginx/html/*
-
-# Copy build artifacts from build stage
 COPY --from=build /app/dist/frontend/browser /usr/share/nginx/html
-
-# Copy custom Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose HTTP port
 EXPOSE 80
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
+    CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

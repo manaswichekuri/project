@@ -22,13 +22,15 @@ def get_db():
         return _db_instance
 
     try:
-        # 2-second timeout to check if real MongoDB server is active
-        client = MongoClient(Config.MONGODB_URI, serverSelectionTimeoutMS=2000)
+        client = MongoClient(Config.MONGODB_URI, serverSelectionTimeoutMS=5000)
         client.admin.command('ping')
         _db_instance = client[Config.MONGODB_DB_NAME]
         _is_mock = False
-        logger.info(f"Connected to MongoDB at {Config.MONGODB_URI}")
+        logger.info("Connected to MongoDB.")
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        if not Config.ALLOW_MOCK_FALLBACK:
+            logger.error(f"Could not connect to MongoDB server ({e}) and mock fallback is disabled.")
+            raise RuntimeError("MongoDB is unavailable. Check MONGODB_URI or set ALLOW_MOCK_FALLBACK=true for local development.") from e
         logger.warning(f"Could not connect to MongoDB server ({e}). Falling back to in-memory mongomock database.")
         client = mongomock.MongoClient()
         _db_instance = client[Config.MONGODB_DB_NAME]
@@ -36,14 +38,20 @@ def get_db():
 
     return _db_instance
 
+def reset_db_connection():
+    """Drops the cached connection so the next get_db() call reconnects (used by tests)."""
+    global _db_instance, _is_mock
+    _db_instance = None
+    _is_mock = False
+
 def is_mock_db():
-    global _is_mock
     return _is_mock
 
 def init_db_indexes():
     db = get_db()
     try:
         db.users.create_index("user_id", unique=True)
+        db.admins.create_index("username", unique=True)
         db.activities.create_index([("user_id", 1), ("timestamp", -1)])
         db.risk_scores.create_index([("user_id", 1), ("evaluated_at", -1)])
         db.alerts.create_index("alert_id", unique=True)

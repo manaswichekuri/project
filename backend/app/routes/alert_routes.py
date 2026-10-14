@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify
 from app.services.alert_service import get_alerts, update_alert_status, get_alert_stats
 from app.utils.json_encoder import jsonify_doc
+from app.utils.auth import require_auth
 
 alert_bp = Blueprint('alerts', __name__, url_prefix='/api/v1/alerts')
+alert_bp.before_request(require_auth)
 
 @alert_bp.route('', methods=['GET'])
 def list_alerts():

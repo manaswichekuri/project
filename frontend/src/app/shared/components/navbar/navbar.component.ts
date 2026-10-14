@@ -1,7 +1,8 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
+import { AdminUser, AuthService } from '../../../core/services/auth.service';
+import { NotificationService } from '../../../core/services/notification.service';
 import { ApiService } from '../../../core/services/api.service';
 
 @Component({
@@ -156,13 +157,13 @@ import { ApiService } from '../../../core/services/api.service';
   `]
 })
 export class NavbarComponent {
-  @Output() actionTriggered = new EventEmitter<string>();
   isProcessing = false;
-  currentUser: any;
+  currentUser: AdminUser | null;
 
   constructor(
     private authService: AuthService,
     private apiService: ApiService,
+    private notifications: NotificationService,
     private router: Router
   ) {
     this.currentUser = this.authService.getCurrentUser();
@@ -171,10 +172,10 @@ export class NavbarComponent {
   onGenerateData(): void {
     this.isProcessing = true;
     this.apiService.generateSyntheticData(7, true).subscribe({
-      next: () => {
+      next: (res) => {
         this.isProcessing = false;
+        this.notifications.success(res.message || 'Synthetic dataset generated.');
         this.apiService.notifyDataChanged();
-        this.actionTriggered.emit('DATA_GENERATED');
       },
       error: () => this.isProcessing = false
     });
@@ -183,10 +184,10 @@ export class NavbarComponent {
   onRunDetection(): void {
     this.isProcessing = true;
     this.apiService.runMlDetection().subscribe({
-      next: () => {
+      next: (res) => {
         this.isProcessing = false;
+        this.notifications.success(`${res.message} ${res.alerts_generated ?? 0} new alert(s).`);
         this.apiService.notifyDataChanged();
-        this.actionTriggered.emit('DETECTION_COMPLETED');
       },
       error: () => this.isProcessing = false
     });

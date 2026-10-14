@@ -90,28 +90,35 @@ ai-insider-threat-detection/
 ├── backend/
 │   ├── app/
 │   │   ├── config/             # Environment & threshold settings
-│   │   ├── models/             # Schema specifications
 │   │   ├── services/           # Business logic & database operations
 │   │   ├── ml/                 # Preprocessor, Isolation Forest, Explainer, Generator
 │   │   ├── routes/             # REST API endpoints (Auth, Users, Activity, Risk, Alerts)
-│   │   └── utils/              # MongoDB connection & JSON serializers
+│   │   └── utils/              # MongoDB connection, JWT auth, request parsing, JSON serializers
 │   ├── datasets/               # Saved model artifacts & sample datasets
 │   ├── tests/                  # Pytest automated test suites
-│   ├── requirements.txt        # Python package dependencies
+│   ├── requirements.txt        # Runtime dependencies (requirements-dev.txt adds pytest)
+│   ├── Dockerfile              # Gunicorn production image
 │   ├── .env.example
-│   └── run.py                  # Flask server entry point
+│   ├── run.py                  # Development server entry point
+│   └── wsgi.py                 # Production WSGI entry point (gunicorn)
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── core/           # Guards, Services (ApiService, AuthService)
+│   │   │   ├── core/           # Guards, JWT interceptor, Services (Api, Auth, Notifications)
 │   │   │   ├── models/         # TypeScript interfaces
 │   │   │   ├── pages/          # Login, Dashboard, Users, User-Detail, Activity-Logs, Alerts, Analytics, System-Info
 │   │   │   └── shared/         # Navbar, Sidebar, MetricCard, RiskBadge
+│   │   ├── environments/       # API base URL
 │   │   └── styles.scss         # Cyber SOC Dark Theme
 │   ├── angular.json
+│   ├── proxy.conf.json         # Dev-server proxy for /api
+│   ├── nginx.conf              # Production web server + API proxy
+│   ├── Dockerfile
 │   └── package.json
 │
+├── docker-compose.yml
+├── .env.example
 ├── README.md
 └── .gitignore
 ```
@@ -203,116 +210,135 @@ ai-insider-threat-detection/
 7. **`device_deviation_count`**: Logins originating from unregistered MAC addresses.
 
 ### Isolation Forest Anomaly Detection
-Features are scaled via `StandardScaler` and passed to scikit-learn's `IsolationForest(n_estimators=100, contamination=0.1)`. The tree structure isolates anomalies close to the root, yielding decision scores in $[-0.5, 0.5]$.
+Features are scaled via `StandardScaler` and passed to scikit-learn's `IsolationForest(n_estimators=100, contamination=0.1)`. Anomalies are isolated close to the root of the trees. The model's anomaly score $s \in (0, 1]$ (exposed as `-score_samples`) is $\le 0.5$ for ordinary behavior and approaches $1$ for clear outliers.
 
 ### Interpretable Risk Scoring Formula
-The decision score is transformed to a $0–100$ scale:
-$$\text{Risk Score} = \min\left(100, \text{Normalizer}(\text{Raw Score}) + \sum \text{Rule Additions}\right)$$
+The anomaly score contributes up to 50 points, and transparent heuristic rules (after-hours ratio, failed logins, download/upload volume, location/device deviations) add the rest:
+$$\text{ML Points} = \text{clip}\big((s - 0.5) \times 100,\ 0,\ 50\big)$$
+$$\text{Risk Score} = \min\left(100,\ \text{ML Points} + \sum \text{Rule Additions}\right)$$
 
 - **Risk Categories**:
   - `Low`: 0.0 – 29.9
   - `Medium`: 30.0 – 59.9
-  - `High`: 60.0 – 84.9
-  - `Critical`: 85.0 – 100.0
+  - `High`: 60.0 – 84.9 (`RISK_THRESHOLD_HIGH`)
+  - `Critical`: 85.0 – 100.0 (`RISK_THRESHOLD_CRITICAL`)
 
 ---
 
 ## REST API Documentation
 
+All endpoints except `/api/v1/health` and `/api/v1/auth/login` require an `Authorization: Bearer <token>` header. Tokens are signed JWTs (HS256, signed with `SECRET_KEY`) that expire after `JWT_EXPIRES_HOURS`.
+
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/auth/login` | Admin authentication (`admin` / `Admin@12345`) |
+| `GET` | `/api/v1/health` | Public liveness probe (used by Docker healthchecks) |
+| `POST` | `/api/v1/auth/login` | Admin authentication, returns a JWT (`admin` / `Admin@12345` by default) |
+| `GET` | `/api/v1/auth/me` | Current admin profile for the supplied token |
 | `GET` | `/api/v1/users` | List monitored users with search & risk filters |
 | `GET` | `/api/v1/users/<id>` | Get individual user profile |
 | `GET` | `/api/v1/users/<id>/risk-profile` | Get user risk history, timeline, and explanations |
-| `GET` | `/api/v1/activities` | List activity logs with pagination and filters |
-| `POST` | `/api/v1/activities/synthetic/generate` | Trigger synthetic user behavior generator |
+| `GET` | `/api/v1/activities` | List activity logs (`page`, `limit` ≤ 500, `user_id`, `event_type`, `after_hours`) |
+| `GET` | `/api/v1/activities/stats` | Activity counts per event type |
+| `POST` | `/api/v1/activities` | Ingest one activity log (`user_id`, `event_type`, `timestamp` required) |
+| `POST` | `/api/v1/activities/synthetic/generate` | Trigger synthetic user behavior generator (`days` 1–60, `reset`) |
 | `POST` | `/api/v1/ml/run-detection` | Run Isolation Forest anomaly detection & update risk scores |
 | `GET` | `/api/v1/ml/model-info` | Get model hyperparameters and feature list |
 | `GET` | `/api/v1/risk/summary` | Organizational risk summary and category distribution |
 | `GET` | `/api/v1/alerts` | List security alerts filtered by status and severity |
-| `PATCH` | `/api/v1/alerts/<id>` | Update alert ticket status (`Open`, `Investigating`, `Resolved`) |
+| `GET` | `/api/v1/alerts/stats` | Alert counts by status and severity |
+| `PATCH` | `/api/v1/alerts/<id>` | Update alert ticket status (`Open`, `Investigating`, `Resolved`) and `notes` |
 | `GET` | `/api/v1/system/status` | System diagnostics and database connection info |
 
 ---
 
 ## Quickstart & Execution Guide
 
-### Option A: Run with Docker Compose (Recommended)
+### Option A: Deploy with Docker Compose (Recommended)
 
-Run the entire system (MongoDB, Flask Backend, and Angular Frontend) with a single command:
+The stack runs MongoDB, the Flask API (served by Gunicorn as a non-root user), and the Angular build (served by Nginx). Only the Nginx port is published. Nginx serves the SPA and proxies `/api/` to the backend over the internal Docker network, so MongoDB and the API are not exposed to the host.
 
 ```bash
-# Build and start all services in the background
-docker compose up -d
+# 1. Configure secrets (SECRET_KEY is required; compose refuses to start without it)
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_hex(32))"   # paste into SECRET_KEY=
+# also change ADMIN_PASSWORD for any internet-facing deployment
 
-# Check status of running containers
+# 2. Build and start everything
+docker compose up -d --build
+
+# 3. Check that all three containers report (healthy)
 docker compose ps
 
-# View logs
-docker compose logs -f
-
-# Stop all services
-docker compose down
+# Logs / stop
+docker compose logs -f backend
+docker compose down          # data persists in the mongodb_data volume
 ```
 
-- **Frontend SOC Dashboard**: [http://localhost:4200](http://localhost:4200)
-- **Backend REST API**: [http://localhost:5001](http://localhost:5001)
-- **MongoDB**: `localhost:27017`
-- **Default Admin Credentials**:
-  - **Username**: `admin`
-  - **Password**: `Admin@12345`
+- **SOC Dashboard**: [http://localhost:8080](http://localhost:8080) (change it with `FRONTEND_PORT`)
+- **API (via the proxy)**: `http://localhost:8080/api/v1`
+- **Admin login**: `ADMIN_USERNAME` / `ADMIN_PASSWORD` from `.env` (defaults to `admin` / `Admin@12345`)
+
+After logging in, click **Generate Data** and then **Run Detection** in the top bar to populate the dashboard.
+
+To deploy on a server, run the same commands on any Linux VM with Docker. Put a TLS-terminating reverse proxy (Caddy, Traefik, or a cloud load balancer) in front of `FRONTEND_PORT` to serve HTTPS.
+
+#### Environment variables
+| Variable | Default | Purpose |
+|---|---|---|
+| `SECRET_KEY` | *(required)* | JWT signing key |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / `Admin@12345` | Seeded admin account (changing the password re-hashes it on restart) |
+| `JWT_EXPIRES_HOURS` | `8` | Session lifetime |
+| `FRONTEND_PORT` | `8080` | Host port for the dashboard |
+| `CORS_ORIGINS` | `http://localhost` | Comma-separated origins allowed for direct API access |
+| `GUNICORN_WORKERS` | `2` | API worker processes |
+| `CONTAMINATION_RATE`, `RISK_THRESHOLD_HIGH`, `RISK_THRESHOLD_CRITICAL` | `0.1`, `60`, `85` | ML / scoring tuning |
 
 ---
 
-### Option B: Local Manual Setup (Without Docker)
+### Option B: Local Development (Without Docker)
 
 #### Prerequisites
 - **Python 3.10+**
 - **Node.js v20+** & **npm**
-- *(Optional)* Local MongoDB Server (defaults to auto-fallback in-memory store)
+- *(Optional)* Local MongoDB server. In development the API falls back to an in-memory store when MongoDB is unreachable (`ALLOW_MOCK_FALLBACK=true`).
 
 ### 1. Backend Setup & Launch
 ```bash
-# Navigate to backend directory
 cd backend
-
-# Create virtual environment (if not already created)
 python3 -m venv venv
-
-# Activate virtual environment
 source venv/bin/activate
-
-# Install requirements
-pip install -r requirements.txt
-
-# Start Flask REST API Server
+pip install -r requirements-dev.txt
+cp .env.example .env        # optional: adjust settings
 python run.py
 ```
-*Backend API will run on `http://localhost:5000`.*
+*Backend API runs on `http://localhost:5001`.*
 
 ### 2. Frontend Setup & Launch
 ```bash
-# Navigate to frontend directory
 cd frontend
-
-# Install Node dependencies (if not already installed)
-npm install
-
-# Start Angular development server
+npm ci
 npm start
 ```
-*Frontend application will run on `http://localhost:4200`.*
+*The frontend runs on `http://localhost:4200`. `ng serve` proxies `/api` to `http://localhost:5001` (see `proxy.conf.json`).*
 
 ---
 
 ## Automated Testing Instructions
 
-To execute the backend pytest test suite covering authentication, feature extraction, ML Isolation Forest scoring, risk heuristics, and REST APIs:
+Backend (pytest, using an isolated in-memory DB per test). It covers JWT auth, input validation, feature extraction, Isolation Forest scoring, risk categorisation, and every REST endpoint:
 
 ```bash
 cd backend
-PYTHONPATH=. venv/bin/pytest tests/
+source venv/bin/activate
+pytest -q
+```
+
+Frontend (Karma + Jasmine, headless Chrome) and production build:
+
+```bash
+cd frontend
+npx ng test --watch=false --browsers=ChromeHeadless
+npm run build
 ```
 
 ---

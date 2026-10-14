@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 
@@ -174,12 +175,18 @@ import { ApiService } from '../../core/services/api.service';
   `]
 })
 export class SystemInfoComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   modelInfo: any = null;
   systemStatus: any = null;
 
   constructor(private apiService: ApiService) {}
 
   ngOnInit(): void {
+    this.load();
+    this.apiService.dataRefresh$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
+  }
+
+  load(): void {
     this.apiService.getModelInfo().subscribe(data => this.modelInfo = data);
     this.apiService.getSystemStatus().subscribe(data => this.systemStatus = data);
   }

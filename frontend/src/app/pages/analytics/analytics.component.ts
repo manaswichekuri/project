@@ -1,8 +1,19 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartData } from 'chart.js';
 import { ApiService } from '../../core/services/api.service';
+import { ActivityLog } from '../../models/activity.model';
+
+const EVENT_TYPES: { key: ActivityLog['event_type']; label: string }[] = [
+  { key: 'FILE_DOWNLOAD', label: 'File Download' },
+  { key: 'FILE_UPLOAD', label: 'File Upload' },
+  { key: 'FILE_ACCESS', label: 'File Access' },
+  { key: 'LOGIN', label: 'Login' },
+  { key: 'LOGOUT', label: 'Logout' },
+  { key: 'APP_USAGE', label: 'App Usage' }
+];
 
 @Component({
   selector: 'app-analytics',
@@ -114,6 +125,7 @@ import { ApiService } from '../../core/services/api.service';
   `]
 })
 export class AnalyticsComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
   public chartOptions: ChartConfiguration['options'] = {
     responsive: true,
     maintainAspectRatio: false,
@@ -145,10 +157,10 @@ export class AnalyticsComponent implements OnInit {
   };
 
   public eventPieChartData: ChartData<'pie'> = {
-    labels: ['File Download', 'File Upload', 'File Access', 'Login', 'App Usage'],
+    labels: EVENT_TYPES.map(e => e.label),
     datasets: [{
-      data: [45, 20, 110, 85, 30],
-      backgroundColor: ['#06b6d4', '#6366f1', '#8b5cf6', '#10b981', '#f59e0b'],
+      data: EVENT_TYPES.map(() => 0),
+      backgroundColor: ['#06b6d4', '#6366f1', '#8b5cf6', '#10b981', '#64748b', '#f59e0b'],
       borderWidth: 0
     }]
   };
@@ -166,7 +178,7 @@ export class AnalyticsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAnalytics();
-    this.apiService.dataRefresh$.subscribe(() => {
+    this.apiService.dataRefresh$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.loadAnalytics();
     });
   }
@@ -182,6 +194,11 @@ export class AnalyticsComponent implements OnInit {
         ];
         this.riskPieChartData = { ...this.riskPieChartData };
       }
+    });
+
+    this.apiService.getActivityStats().subscribe(res => {
+      this.eventPieChartData.datasets[0].data = EVENT_TYPES.map(e => res.event_type_breakdown[e.key] ?? 0);
+      this.eventPieChartData = { ...this.eventPieChartData };
     });
 
     this.apiService.getAlertStats().subscribe(res => {

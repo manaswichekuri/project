@@ -27,3 +27,9 @@ export interface ActivityListResponse {
   limit: number;
   pages: number;
 }
+
+export interface ActivityStats {
+  total: number;
+  event_type_breakdown: Partial<Record<ActivityLog['event_type'], number>>;
+  after_hours: number;
+}

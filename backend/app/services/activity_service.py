@@ -28,5 +28,18 @@ def get_activities(user_id=None, event_type=None, after_hours_only=False, page=1
 
 def add_activity_log(activity_dict):
     db = get_db()
-    db.activities.insert_one(activity_dict)
+    db.activities.insert_one(dict(activity_dict))
     return activity_dict
+
+def get_activity_stats():
+    db = get_db()
+    counts = {
+        row['_id']: row['count']
+        for row in db.activities.aggregate([{'$group': {'_id': '$event_type', 'count': {'$sum': 1}}}])
+        if row['_id']
+    }
+    return {
+        'total': sum(counts.values()),
+        'event_type_breakdown': counts,
+        'after_hours': db.activities.count_documents({'after_hours': True})
+    }

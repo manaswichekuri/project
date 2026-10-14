@@ -1,7 +1,9 @@
 import random
+import uuid
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from app.utils.db import get_db
+from app.utils.time_utils import utc_now
 
 DEPARTMENTS = ['Finance', 'Engineering', 'Human Resources', 'Sales', 'Executive', 'IT Support']
 ROLES = {
@@ -93,7 +95,7 @@ def generate_synthetic_dataset(num_days=7, reset_db=True):
             'baseline_location': 'New York, USA',
             'baseline_device': f"DEV-{user_id}",
             'is_demo_synthetic': True,
-            'created_at': datetime.utcnow()
+            'created_at': utc_now()
         }
         db.users.update_one({'user_id': user_id}, {'$set': user_doc}, upsert=True)
         created_users.append(user_doc)
@@ -109,7 +111,7 @@ def generate_synthetic_dataset(num_days=7, reset_db=True):
             'baseline_location': 'New York, USA',
             'baseline_device': f"DEV-{user_id}",
             'is_demo_synthetic': True,
-            'created_at': datetime.utcnow()
+            'created_at': utc_now()
         }
         db.users.update_one({'user_id': user_id}, {'$set': user_doc}, upsert=True)
         created_users.append(user_doc)
@@ -125,16 +127,18 @@ def generate_synthetic_dataset(num_days=7, reset_db=True):
             'baseline_location': 'New York, USA',
             'baseline_device': f"DEV-{user_id}",
             'is_demo_synthetic': True,
-            'created_at': datetime.utcnow()
+            'created_at': utc_now()
         }
         db.users.update_one({'user_id': user_id}, {'$set': user_doc}, upsert=True)
         created_users.append(user_doc)
 
     # Generate timeline of logs over num_days
     activities = []
-    now = datetime.utcnow()
+    now = utc_now().replace(tzinfo=None)
     start_time = now - timedelta(days=num_days)
 
+    # Unique per generation run so non-reset runs never produce duplicate IDs
+    batch_prefix = uuid.uuid4().hex[:4].upper()
     activity_id_counter = 10000
 
     for day in range(num_days):
@@ -202,7 +206,7 @@ def generate_synthetic_dataset(num_days=7, reset_db=True):
                     after_hours = False
 
                 act_doc = {
-                    'activity_id': f"ACT-{activity_id_counter}",
+                    'activity_id': f"ACT-{batch_prefix}-{activity_id_counter}",
                     'user_id': u_id,
                     'timestamp': event_time.isoformat() + 'Z',
                     'event_type': event_type,

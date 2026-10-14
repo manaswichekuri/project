@@ -1,11 +1,12 @@
+import os
 import uuid
-from datetime import datetime
 from app.utils.db import get_db
 from app.ml.preprocessor import FeaturePreprocessor
 from app.ml.model import IsolationForestModel
 from app.ml.explainer import RiskExplainer
 from app.ml.synthetic_generator import generate_synthetic_dataset
 from app.config.settings import Config
+from app.utils.time_utils import utc_now_iso
 
 def run_ml_detection_pipeline():
     db = get_db()
@@ -36,10 +37,10 @@ def run_ml_detection_pipeline():
     model = IsolationForestModel(contamination=Config.CONTAMINATION_RATE)
     model.train(X_scaled)
     raw_scores = model.predict_anomaly_scores(X_scaled)
-    model.save_model()
+    model.save_model(os.path.join(Config.MODEL_DIR, 'pretrained_model.joblib'))
 
     # 4. Compute risk scores and explainable reasons for each user
-    evaluated_at = datetime.utcnow().isoformat() + 'Z'
+    evaluated_at = utc_now_iso()
     risk_score_docs = []
     alert_docs = []
 
@@ -47,9 +48,10 @@ def run_ml_detection_pipeline():
         u_id = row['user_id']
         raw_score = float(raw_scores[idx])
 
-        # Normalize raw score: Isolation Forest score_samples is roughly in [-0.5, 0.5]
-        # Invert score so higher = more anomalous
-        ml_anomaly_weight = max(0.0, min(50.0, (-raw_score + 0.25) * 50.0))
+        # score_samples returns -s, where s in (0, 1] is the Isolation Forest anomaly score:
+        # s <= 0.5 means no distinct anomaly, s -> 1 means clearly anomalous. Map s in [0.5, 1] to 0-50 points.
+        anomaly_score = -raw_score
+        ml_anomaly_weight = max(0.0, min(50.0, (anomaly_score - 0.5) * 100.0))
 
         # Heuristic Risk Rule Additions
         rule_points = 0.0

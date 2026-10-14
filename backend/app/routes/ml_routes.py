@@ -2,8 +2,10 @@ from flask import Blueprint, jsonify
 from app.services.risk_service import run_ml_detection_pipeline
 from app.config.settings import Config
 from app.utils.json_encoder import jsonify_doc
+from app.utils.auth import require_auth
 
 ml_bp = Blueprint('ml', __name__, url_prefix='/api/v1/ml')
+ml_bp.before_request(require_auth)
 
 @ml_bp.route('/run-detection', methods=['POST'])
 def run_detection():

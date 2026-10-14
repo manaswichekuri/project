@@ -2,15 +2,16 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
 import { User, UserListResponse } from '../../models/user.model';
-import { ActivityListResponse } from '../../models/activity.model';
+import { ActivityListResponse, ActivityStats } from '../../models/activity.model';
 import { RiskSummary } from '../../models/risk.model';
 import { AlertListResponse, AlertStats, SecurityAlert } from '../../models/alert.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  private baseUrl = 'http://localhost:5001/api/v1';
+  private baseUrl = environment.apiBaseUrl;
   private dataRefreshSource = new Subject<void>();
   public dataRefresh$ = this.dataRefreshSource.asObservable();
 
@@ -35,11 +36,11 @@ export class ApiService {
   }
 
   getUserById(userId: string): Observable<{ user: User }> {
-    return this.http.get<{ user: User }>(`${this.baseUrl}/users/${userId}`);
+    return this.http.get<{ user: User }>(`${this.baseUrl}/users/${encodeURIComponent(userId)}`);
   }
 
   getUserRiskProfile(userId: string): Observable<any> {
-    return this.http.get<any>(`${this.baseUrl}/users/${userId}/risk-profile`);
+    return this.http.get<any>(`${this.baseUrl}/users/${encodeURIComponent(userId)}/risk-profile`);
   }
 
   // Activity Logs
@@ -51,6 +52,10 @@ export class ApiService {
     if (eventType) params = params.set('event_type', eventType);
     if (afterHours) params = params.set('after_hours', 'true');
     return this.http.get<ActivityListResponse>(`${this.baseUrl}/activities`, { params });
+  }
+
+  getActivityStats(): Observable<ActivityStats> {
+    return this.http.get<ActivityStats>(`${this.baseUrl}/activities/stats`);
   }
 
   generateSyntheticData(days: number = 7, reset: boolean = true): Observable<any> {
@@ -81,7 +86,7 @@ export class ApiService {
   }
 
   updateAlertStatus(alertId: string, status: string, notes?: string): Observable<{ message: string; alert: SecurityAlert }> {
-    return this.http.patch<{ message: string; alert: SecurityAlert }>(`${this.baseUrl}/alerts/${alertId}`, { status, notes });
+    return this.http.patch<{ message: string; alert: SecurityAlert }>(`${this.baseUrl}/alerts/${encodeURIComponent(alertId)}`, { status, notes });
   }
 
   getAlertStats(): Observable<AlertStats> {
