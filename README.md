@@ -257,30 +257,58 @@ All endpoints except `/api/v1/health` and `/api/v1/auth/login` require an `Autho
 
 The stack runs MongoDB, the Flask API (served by Gunicorn as a non-root user), and the Angular build (served by Nginx). Only the Nginx port is published. Nginx serves the SPA and proxies `/api/` to the backend over the internal Docker network, so MongoDB and the API are not exposed to the host.
 
+#### Prerequisites
+- **Docker** with the **Compose v2** plugin (Docker Desktop on macOS/Windows, or Docker Engine on Linux). Check with `docker compose version`.
+- **Git** and **Python 3** (Python is only used to generate a secret key).
+
+#### Step 1: Get the code
 ```bash
-# 1. Configure secrets (SECRET_KEY is required; compose refuses to start without it)
-cp .env.example .env
-python3 -c "import secrets; print(secrets.token_hex(32))"   # paste into SECRET_KEY=
-# also change ADMIN_PASSWORD for any internet-facing deployment
-
-# 2. Build and start everything
-docker compose up -d --build
-
-# 3. Check that all three containers report (healthy)
-docker compose ps
-
-# Logs / stop
-docker compose logs -f backend
-docker compose down          # data persists in the mongodb_data volume
+git clone https://github.com/manaswichekuri/project.git
+cd project
 ```
 
-- **SOC Dashboard**: [http://localhost:8080](http://localhost:8080) (change it with `FRONTEND_PORT`)
-- **API (via the proxy)**: `http://localhost:8080/api/v1`
-- **Admin login**: `ADMIN_USERNAME` / `ADMIN_PASSWORD` from `.env` (defaults to `admin` / `Admin@12345`)
+#### Step 2: Create your `.env` file
+```bash
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+Open `.env` and paste the generated value after `SECRET_KEY=`. Docker Compose refuses to start while `SECRET_KEY` is empty. For any server reachable from the internet, also change `ADMIN_PASSWORD`. The `.env` file is git-ignored, so never commit it.
 
-After logging in, click **Generate Data** and then **Run Detection** in the top bar to populate the dashboard.
+#### Step 3: Build and start
+```bash
+docker compose up -d --build
+docker compose ps
+```
+The first build takes a few minutes. Wait until all three containers (`insider_threat_mongo`, `insider_threat_backend`, `insider_threat_frontend`) show **(healthy)**.
 
-To deploy on a server, run the same commands on any Linux VM with Docker. Put a TLS-terminating reverse proxy (Caddy, Traefik, or a cloud load balancer) in front of `FRONTEND_PORT` to serve HTTPS.
+#### Step 4: Open the dashboard and load demo data
+1. Go to **[http://localhost:8080](http://localhost:8080)**. Change the port with `FRONTEND_PORT` in `.env`.
+2. Log in with `ADMIN_USERNAME` / `ADMIN_PASSWORD` from `.env` (defaults to `admin` / `Admin@12345`).
+3. Click **Generate Data** in the top bar, then **Run Detection**. The dashboard, users, alerts, and analytics pages then fill with results.
+
+The API is available through the same port at `http://localhost:8080/api/v1` (see [REST API Documentation](#rest-api-documentation)).
+
+#### Day-to-day commands
+| Task | Command |
+|---|---|
+| Stop the app (data is kept) | `docker compose down` |
+| Start it again | `docker compose up -d` |
+| Update after pulling new code | `git pull && docker compose up -d --build` |
+| Follow the backend logs | `docker compose logs -f backend` |
+| Check container health | `docker compose ps` |
+| **Delete all data** and start fresh (cannot be undone) | `docker compose down -v` |
+
+Data lives in two named Docker volumes: `mongodb_data` (database) and `model_data` (trained model). These survive `down` and `up`; only `down -v` removes them.
+
+#### Troubleshooting
+- **`Set SECRET_KEY in .env`**: Step 2 was skipped, or `SECRET_KEY=` is still empty.
+- **`port is already allocated`**: another program is using port 8080. Set `FRONTEND_PORT=8081` (or another free port) in `.env` and run `docker compose up -d` again.
+- **Backend stays `unhealthy`**: run `docker compose logs backend`. In production mode the API stops with a clear error if it cannot reach MongoDB, rather than silently using a temporary in-memory database.
+- **Logged out unexpectedly**: sessions expire after `JWT_EXPIRES_HOURS` (default 8). Changing `SECRET_KEY` also signs everyone out.
+- **Changed `ADMIN_PASSWORD`**: run `docker compose up -d` so the backend restarts. The stored password is updated on startup.
+
+#### Deploying to a server
+Run the same steps on any Linux VM with Docker installed. Put a TLS-terminating reverse proxy (Caddy, Traefik, or a cloud load balancer) in front of `FRONTEND_PORT` to serve HTTPS. If browsers will reach the API from a different domain than the dashboard, add that origin to `CORS_ORIGINS`.
 
 #### Environment variables
 | Variable | Default | Purpose |
