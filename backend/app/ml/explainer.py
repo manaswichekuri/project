@@ -17,12 +17,12 @@ class RiskExplainer:
 
         if after_hours_ratio > 0.20:
             pct = int(after_hours_ratio * 100)
-            reasons.append(f"Unusual after-hours activity ({pct}% of session events outside standard hours)")
+            reasons.append(f"Unusual after-hours activity ({pct}% of recorded events outside standard hours)")
 
         if failed_logins >= 3:
-            reasons.append(f"Multiple failed login attempts detected ({failed_logins} consecutive failures)")
+            reasons.append(f"Multiple failed login attempts detected ({failed_logins} failed attempts over the analysis period)")
         elif failed_logins >= 1:
-            reasons.append(f"Occasional login authentication failures ({failed_logins} failed attempt)")
+            reasons.append(f"Occasional login authentication failures ({failed_logins} failed attempt{'s' if failed_logins != 1 else ''} over the analysis period)")
 
         if download_mb > 300.0:
             reasons.append(f"Download volume significantly above baseline ({download_mb:.1f} MB downloaded)")
@@ -41,7 +41,7 @@ class RiskExplainer:
             reasons.append("Device hardware deviation (access from unregistered MAC / endpoint)")
 
         if file_count > 35:
-            reasons.append(f"High file access velocity ({file_count} files accessed in session)")
+            reasons.append(f"High file access volume ({file_count} files accessed over the analysis period)")
 
         if not reasons:
             reasons.append("Behavior consistent with standard employee baseline profile")

@@ -29,6 +29,11 @@ def test_risk_explainer_reasons():
     assert any('Multiple failed login attempts' in r for r in reasons_anom)
     assert any('Download volume significantly above baseline' in r for r in reasons_anom)
     assert any('Abnormally high data egress' in r for r in reasons_anom)
+    # Counts are totals across the analysis window, not single-session or consecutive figures
+    assert not any('consecutive' in r or 'in session' in r for r in reasons_anom)
+
+    reasons_one = RiskExplainer.generate_reasons_for_user({**normal_row, 'failed_login_count': 1})
+    assert any('(1 failed attempt over the analysis period)' in r for r in reasons_one)
 
 def test_full_risk_detection_run(auth_client, db):
     res_gen = auth_client.post('/api/v1/activities/synthetic/generate', json={'days': 3, 'reset': True})
