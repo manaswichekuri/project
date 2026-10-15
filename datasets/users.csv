@@ -1,0 +1,15 @@
+user_id,name,email,department,role,baseline_location,baseline_device,created_at
+EMP-1001,Alexander Wright,alexander.wright@enterprise.internal,Engineering,Senior Software Engineer,"New York, USA",DEV-EMP-1001,2026-01-15T00:00:00
+EMP-1002,Elena Rostova,elena.rostova@enterprise.internal,Finance,Accountant,"New York, USA",DEV-EMP-1002,2026-01-15T00:00:00
+EMP-1003,Marcus Vance,marcus.vance@enterprise.internal,Human Resources,People Ops Specialist,"New York, USA",DEV-EMP-1003,2026-01-15T00:00:00
+EMP-1004,Sophia Chen,sophia.chen@enterprise.internal,Sales,BDR,"New York, USA",DEV-EMP-1004,2026-01-15T00:00:00
+EMP-1005,David Kim,david.kim@enterprise.internal,IT Support,Helpdesk Tech,"New York, USA",DEV-EMP-1005,2026-01-15T00:00:00
+EMP-1006,Rachel Adams,rachel.adams@enterprise.internal,Finance,Financial Analyst,"New York, USA",DEV-EMP-1006,2026-01-15T00:00:00
+EMP-1007,Carlos Mendez,carlos.mendez@enterprise.internal,Engineering,Senior Software Engineer,"New York, USA",DEV-EMP-1007,2026-01-15T00:00:00
+EMP-1008,Priya Sharma,priya.sharma@enterprise.internal,Executive,Strategy Lead,"New York, USA",DEV-EMP-1008,2026-01-15T00:00:00
+EMP-1009,James Wilson,james.wilson@enterprise.internal,Sales,BDR,"New York, USA",DEV-EMP-1009,2026-01-15T00:00:00
+EMP-1010,Hannah Taylor,hannah.taylor@enterprise.internal,Human Resources,People Ops Specialist,"New York, USA",DEV-EMP-1010,2026-01-15T00:00:00
+EMP-1011,Viktor Nikitin,viktor.nikitin@enterprise.internal,Engineering,DevOps Engineer,"New York, USA",DEV-EMP-1011,2026-01-15T00:00:00
+EMP-1012,Amara Okafor,amara.okafor@enterprise.internal,Finance,Payroll Specialist,"New York, USA",DEV-EMP-1012,2026-01-15T00:00:00
+EMP-1013,Dmitri Ivanov,dmitri.ivanov@enterprise.internal,IT Support,Helpdesk Tech,"New York, USA",DEV-EMP-1013,2026-01-15T00:00:00
+EMP-1014,Chloe Bennett,chloe.bennett@enterprise.internal,Finance,Payroll Specialist,"New York, USA",DEV-EMP-1014,2026-01-15T00:00:00

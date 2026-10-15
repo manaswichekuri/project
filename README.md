@@ -13,6 +13,21 @@ Instead of relying solely on static rules or black-box predictions, this system 
 
 ---
 
+## Repository Contents
+
+| What | Where |
+|---|---|
+| Datasets used (synthetic users, activity logs, risk scores, alerts) | [`datasets/`](datasets/) (see [`datasets/README.md`](datasets/README.md)) |
+| Standalone ML pipeline (one runnable `.py`, no web app needed) | [`insider_threat_detection.py`](insider_threat_detection.py) |
+| Machine learning code | [`backend/app/ml/`](backend/app/ml/): [`synthetic_generator.py`](backend/app/ml/synthetic_generator.py), [`preprocessor.py`](backend/app/ml/preprocessor.py), [`model.py`](backend/app/ml/model.py), [`scoring.py`](backend/app/ml/scoring.py), [`explainer.py`](backend/app/ml/explainer.py) |
+| REST API (Flask) | [`backend/app/routes/`](backend/app/routes/), [`backend/app/services/`](backend/app/services/) |
+| SOC dashboard (Angular) | [`frontend/src/app/`](frontend/src/app/) |
+| Tests | [`backend/tests/`](backend/tests/), `frontend/src/**/*.spec.ts` |
+| Dataset export script | [`scripts/export_datasets.py`](scripts/export_datasets.py) |
+| Deployment | [`docker-compose.yml`](docker-compose.yml), [`backend/Dockerfile`](backend/Dockerfile), [`frontend/Dockerfile`](frontend/Dockerfile) |
+
+---
+
 ## Problem Statement & Objectives
 ### Problem Statement
 Enterprise organizations face increasing security risks from insider threats—employees, contractors, or compromised accounts accessing sensitive assets outside their standard baseline behaviors. Traditional rule-based SIEM systems trigger excessive false positives or fail to detect novel exfiltration patterns.
@@ -85,16 +100,16 @@ Enterprise organizations face increasing security risks from insider threats—e
 ## Repository Folder Structure
 
 ```
-ai-insider-threat-detection/
+project/
 │
 ├── backend/
 │   ├── app/
 │   │   ├── config/             # Environment & threshold settings
 │   │   ├── services/           # Business logic & database operations
-│   │   ├── ml/                 # Preprocessor, Isolation Forest, Explainer, Generator
+│   │   ├── ml/                 # Generator, Preprocessor, Isolation Forest, Scoring, Explainer
 │   │   ├── routes/             # REST API endpoints (Auth, Users, Activity, Risk, Alerts)
 │   │   └── utils/              # MongoDB connection, JWT auth, request parsing, JSON serializers
-│   ├── datasets/               # Saved model artifacts & sample datasets
+│   ├── datasets/               # Trained model artifact (created at runtime, git-ignored)
 │   ├── tests/                  # Pytest automated test suites
 │   ├── requirements.txt        # Runtime dependencies (requirements-dev.txt adds pytest)
 │   ├── Dockerfile              # Gunicorn production image
@@ -117,6 +132,10 @@ ai-insider-threat-detection/
 │   ├── Dockerfile
 │   └── package.json
 │
+├── datasets/                   # Synthetic datasets used (CSV) + data dictionary
+├── scripts/
+│   └── export_datasets.py      # Regenerates datasets/ from the real pipeline
+├── insider_threat_detection.py # Standalone ML pipeline (no web app / DB needed)
 ├── docker-compose.yml
 ├── .env.example
 ├── README.md
@@ -348,6 +367,21 @@ npm ci
 npm start
 ```
 *The frontend runs on `http://localhost:4200`. `ng serve` proxies `/api` to `http://localhost:5001` (see `proxy.conf.json`).*
+
+---
+
+### Option C: Run the ML Pipeline Standalone
+
+To see the detection results without the web app, database or Docker, run the single-file pipeline on the bundled datasets:
+
+```bash
+pip install -r backend/requirements.txt
+python insider_threat_detection.py                       # analyse datasets/*.csv
+python insider_threat_detection.py --generate --days 14  # analyse a freshly simulated dataset
+python insider_threat_detection.py --out results.csv     # also save the results as CSV
+```
+
+It prints every user ranked by risk score, the risk distribution, and the explanation for each flagged user. It uses the same feature engineering, Isolation Forest and scoring code as the web app, so the scores are identical.
 
 ---
 

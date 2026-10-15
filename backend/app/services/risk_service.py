@@ -4,6 +4,7 @@ from app.utils.db import get_db
 from app.ml.preprocessor import FeaturePreprocessor
 from app.ml.model import IsolationForestModel
 from app.ml.explainer import RiskExplainer
+from app.ml.scoring import compute_risk
 from app.ml.synthetic_generator import generate_synthetic_dataset
 from app.config.settings import Config
 from app.utils.time_utils import utc_now_iso
@@ -48,37 +49,7 @@ def run_ml_detection_pipeline():
         u_id = row['user_id']
         raw_score = float(raw_scores[idx])
 
-        # score_samples returns -s, where s in (0, 1] is the Isolation Forest anomaly score:
-        # s <= 0.5 means no distinct anomaly, s -> 1 means clearly anomalous. Map s in [0.5, 1] to 0-50 points.
-        anomaly_score = -raw_score
-        ml_anomaly_weight = max(0.0, min(50.0, (anomaly_score - 0.5) * 100.0))
-
-        # Heuristic Risk Rule Additions
-        rule_points = 0.0
-        if row['after_hours_ratio'] > 0.20:
-            rule_points += 25.0 * (row['after_hours_ratio'] * 1.5)
-        if row['failed_login_count'] >= 3:
-            rule_points += min(30.0, row['failed_login_count'] * 7.5)
-        if row['download_volume_mb'] > 300.0:
-            rule_points += min(35.0, (row['download_volume_mb'] / 500.0) * 20.0)
-        if row['upload_volume_mb'] > 100.0:
-            rule_points += min(30.0, (row['upload_volume_mb'] / 200.0) * 20.0)
-        if row['location_deviation_count'] >= 1:
-            rule_points += 25.0 * row['location_deviation_count']
-        if row['device_deviation_count'] >= 1:
-            rule_points += 20.0 * row['device_deviation_count']
-
-        total_risk_score = round(max(0.0, min(100.0, ml_anomaly_weight + rule_points)), 1)
-
-        # Categorize Risk
-        if total_risk_score >= Config.RISK_THRESHOLD_CRITICAL:
-            category = 'Critical'
-        elif total_risk_score >= Config.RISK_THRESHOLD_HIGH:
-            category = 'High'
-        elif total_risk_score >= 30.0:
-            category = 'Medium'
-        else:
-            category = 'Low'
+        total_risk_score, category = compute_risk(row, raw_score)
 
         # Generate Explainable Reasons
         reasons = RiskExplainer.generate_reasons_for_user(row.to_dict())
