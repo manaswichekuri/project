@@ -1,5 +1,32 @@
 # AI-Powered Insider Threat Detection and Risk Scoring System
-### 4th-Year B.Tech CSE Cybersecurity Capstone Project
+### B.Tech CSE Engineering Capstone Project – 1 (23IE4053R/23IE4053A) · KLH University, Hyderabad · A.Y. 2026–2027
+
+| University ID | Team Member |
+|---|---|
+| 2320030366 | P. Sri Harini |
+| 2320030245 | Manaswi Ch |
+| 2320030210 | Hruday K |
+
+**Project Guide:** Dr. K Swanthana, Department of CSE
+
+📄 [Abstract](docs/AI_Insider_Threat_Abstract.docx) · 📑 [Research Paper](docs/Research_Paper.docx) · 📊 [Review Presentation](docs/AI_Insider_Threat_Review_Presentation.pptx) · 🗂️ [Datasets](datasets/) · 🐍 [Standalone ML Script](insider_threat_detection.py)
+
+---
+
+## Project Abstract
+
+*AI-Powered Insider Threat Detection and User Behavior Analytics System* ([abstract document](docs/AI_Insider_Threat_Abstract.docx))
+
+Organizations today face increasing cybersecurity threats not only from external attackers but also from insider threats caused by employees, contractors, or compromised user accounts. Since insiders already have authorized access to organizational resources, detecting malicious or abnormal activities is significantly more challenging than preventing external attacks. Traditional security systems primarily rely on predefined rules and signatures, making them less effective in identifying unusual user behavior.
+
+This project proposes an AI-Powered Insider Threat Detection and User Behavior Analytics (UBA) System that continuously monitors user activities and identifies suspicious behavior using machine learning techniques. The system collects user activity logs such as login times, login locations, file access patterns, download frequency, device usage, and other security events. It establishes a baseline of normal behavior for each user and compares ongoing activities against this profile to detect anomalies.
+
+When suspicious behavior is identified, the system assigns a dynamic risk score based on the severity of the detected actions and generates real-time alerts for security administrators. An interactive dashboard provides visual insights into user activities, anomaly trends, risk levels, and incident timelines, enabling administrators to investigate potential insider threats efficiently. Additionally, the system generates AI-assisted summaries that explain detected incidents in simple language and recommend appropriate mitigation measures.
+
+The proposed solution aims to reduce the time required to identify insider threats, improve organizational security, and support proactive incident response. By integrating cybersecurity principles with artificial intelligence and behavioral analytics, this project offers a scalable and practical approach to protecting sensitive organizational data from internal misuse and compromised accounts.
+
+> [!NOTE]
+> **Proposal vs. current implementation.** This repository implements per-user behavioral baselines, 7 engineered features, Isolation Forest anomaly detection, 0–100 risk scoring, alerts, plain-language explanations, and the SOC dashboard, all on a **synthetic** dataset. These items from the abstract and research paper are **not yet implemented**: AI-generated incident summaries with mitigation recommendations, the Random Forest / XGBoost comparison models, evaluation on the CMU CERT dataset, and continuous real-time log ingestion (detection currently runs on demand).
 
 ---
 
@@ -17,6 +44,7 @@ Instead of relying solely on static rules or black-box predictions, this system 
 
 | What | Where |
 |---|---|
+| Project documents: abstract, research paper, review presentation (12 slides) | [`docs/`](docs/) |
 | Datasets used (synthetic users, activity logs, risk scores, alerts) | [`datasets/`](datasets/) (see [`datasets/README.md`](datasets/README.md)) |
 | Standalone ML pipeline (one runnable `.py`, no web app needed) | [`insider_threat_detection.py`](insider_threat_detection.py) |
 | Machine learning code | [`backend/app/ml/`](backend/app/ml/): [`synthetic_generator.py`](backend/app/ml/synthetic_generator.py), [`preprocessor.py`](backend/app/ml/preprocessor.py), [`model.py`](backend/app/ml/model.py), [`scoring.py`](backend/app/ml/scoring.py), [`explainer.py`](backend/app/ml/explainer.py) |
@@ -132,6 +160,7 @@ project/
 │   ├── Dockerfile
 │   └── package.json
 │
+├── docs/                       # Abstract, research paper, review presentation
 ├── datasets/                   # Synthetic datasets used (CSV) + data dictionary
 ├── scripts/
 │   └── export_datasets.py      # Regenerates datasets/ from the real pipeline
@@ -402,6 +431,25 @@ cd frontend
 npx ng test --watch=false --browsers=ChromeHeadless
 npm run build
 ```
+
+---
+
+## Research Paper & References
+
+The accompanying paper, [*AI-Powered Insider Threat Detection System Using User Behavior Analytics and Machine Learning*](docs/Research_Paper.docx) (Manaswi Chekuri, Sri Harini, Hruday; Dept. of CSE, KLH University), surveys IEEE insider-threat research and sets out the system design, feature engineering, risk scoring, explainability and evaluation methodology. Performance figures quoted in the paper come from the cited studies; they are not results of this project.
+
+**References**
+1. A. A. Alzahrani et al., "A Review of Recent Advances, Challenges, and Opportunities in Malicious Insider Threat Detection Using Machine Learning Methods," *IEEE Access*, vol. 12, pp. 30907–30927, 2024. [doi:10.1109/ACCESS.2024.3369906](https://doi.org/10.1109/ACCESS.2024.3369906)
+2. "Machine Learning-Based Approaches for Malicious Insider Threat Detection: A Survey of Recent Advances and Open Issues," *ICOIICS*, 2025. [doi:10.1109/ICOIICS67115.2025.11390400](https://doi.org/10.1109/ICOIICS67115.2025.11390400)
+3. "Insider Threat Detection Model Using Anomaly-Based Isolation Forest Algorithm," *IEEE Access*, vol. 11, pp. 118170–118185, 2023. [doi:10.1109/ACCESS.2023.3326750](https://doi.org/10.1109/ACCESS.2023.3326750)
+4. "Detecting and Preventing Cyber Insider Threats: A Survey," 2018, IEEE Xplore document 8278157.
+5. "DTITD: An Intelligent Insider Threat Detection Framework Based on Digital Twin and Self-Attention Based Deep Learning Models," *IEEE Access*, vol. 11, pp. 114013–114030, 2023. [doi:10.1109/ACCESS.2023.3324371](https://doi.org/10.1109/ACCESS.2023.3324371)
+6. "Anomaly-Based Insider Threat Detection Using Deep Autoencoders," *IEEE ICDMW*, 2018. [doi:10.1109/ICDMW.2018.00014](https://doi.org/10.1109/ICDMW.2018.00014)
+7. "User Behaviour based Insider Threat Detection in Critical Infrastructures," *ICSCCC*, 2021. [doi:10.1109/ICSCCC51823.2021.9478137](https://doi.org/10.1109/ICSCCC51823.2021.9478137)
+8. "ITDBERT: Temporal-semantic Representation for Insider Threat Detection," *IEEE ISCC*, 2021. [doi:10.1109/ISCC53001.2021.9631538](https://doi.org/10.1109/ISCC53001.2021.9631538)
+9. "A Graph Convolution Neural Network Based Method for Insider Threat Detection," *IEEE ISPA/BDCloud/SocialCom/SustainCom*, 2022. [doi:10.1109/ISPA-BDCloud-SocialCom-SustainCom57177.2022.00016](https://doi.org/10.1109/ISPA-BDCloud-SocialCom-SustainCom57177.2022.00016)
+10. "Employee Watcher: A Machine Learning-based Hybrid Insider Threat Detection Framework," *CSNet*, 2023. [doi:10.1109/CSNet59123.2023.10339777](https://doi.org/10.1109/CSNet59123.2023.10339777)
+11. "NLP and Neural Networks for Insider Threat Detection," *IEEE TrustCom*, 2024. [doi:10.1109/TrustCom63139.2024.00279](https://doi.org/10.1109/TrustCom63139.2024.00279)
 
 ---
 
